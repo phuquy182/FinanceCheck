@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#EDE9FE" />
+<title>Sổ theo dõi trả nợ</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icon.svg" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Sổ nợ" />
+<link rel="stylesheet" href="./app.css" />
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: #F7F5FB; }
+  input, button, select, textarea { font-family: inherit; }
+  #loi { display:none; margin:2rem auto; max-width:32rem; padding:1rem 1.25rem; border-radius:1rem;
+         background:#FFF1F2; color:#9F1239; font:14px/1.6 system-ui,sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="loi"></div>
+
+<script>
+window.addEventListener("error", function (ev) {
+  var box = document.getElementById("loi");
+  if (!box) return;
+  box.style.display = "block";
+  box.textContent = "Trang gap loi: " + (ev.message || "") + " - thu tai lai trang.";
+});
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").then(function (reg) {
+      if (reg.waiting && navigator.serviceWorker.controller && window.coBanMoi) window.coBanMoi();
+      reg.addEventListener("updatefound", function () {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", function () {
+          if (sw.state === "installed" && navigator.serviceWorker.controller && window.coBanMoi) window.coBanMoi();
+        });
+      });
+    }).catch(function () {});
+  });
+}
+</script>
+
+<script type="module">
+/* ================================================================
+   Lop dong bo Firebase.
+   - Phai dang nhap moi thay du lieu.
+   - Bo nho tam luu rieng cho tung tai khoan: so-no:<uid>
+   - Khong bao gio day len truoc khi doi chieu voi dam may.
+   ================================================================ */
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+         setPersistence, browserLocalPersistence }
+  from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+const TEN_APP = "sono";
+let app = null, db = null, uid = null, email = null, unsub = null;
+let daCoSnapshot = false;
+let banDaDay = "";
+let choDay = null;
+let timer = null;
+let dongHoCho = null;   // canh gio: khong de ket o man hinh cho
+
+function docCfg(text) {
+  var t = String(text).replace(/\/\/[^\n]*/g, "").trim();
+  t = t.replace(/^(var|let|const)\s+\w+\s*=\s*/, "").trim();
+  t = t.replace(/;+\s*$/, "").trim();
+  var a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a === -1 || b === -1) throw new Error("khong tim thay dau ngoac nhon");
+  t = t.slice(a, b + 1);
+  t = t.replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":');
+  t = t.replace(/'/g, '"');
+  t = t.replace(/,(\s*[}\]])/g, "$1");
+  return JSON.parse(t);
+}
+
+const gio = () => new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+const moc = (json) => { try { return JSON.parse(json).updatedAt || 0; } catch (e) { return 0; } };
+const khoaTam = () => "so-no:" + uid;
+
+const S = {
+  status: { state: "cho", msg: "Đang mở sổ nợ…", email: null },
+  onStatus: null,
+  _set(state, msg) {
+    S.status = { state: state, msg: msg, email: email };
+    if (S.onStatus) S.onStatus(S.status);
+  },
+
+  async connect(cfgText, e_mail, pass) {
+    S._set("dang", "Đang đăng nhập…");
+    let cfg;
+    try { cfg = docCfg(cfgText); }
+    catch (err) {
+      S._set("loi", "Cấu hình không đọc được. Dán lại khối firebaseConfig, giữ cả dấu { và }.");
+      throw err;
+    }
+    try {
+      if (app) { try { await deleteApp(app); } catch (e2) {} }
+      daCoSnapshot = false; banDaDay = ""; choDay = null;
+      app = initializeApp(cfg, TEN_APP + "-" + Date.now());
+      const auth = getAuth(app);
+      db = getFirestore(app);
+      try { await setPersistence(auth, browserLocalPersistence); } catch (e3) {}
+      await Promise.race([
+        signInWithEmailAndPassword(auth, e_mail.trim(), pass),
+        new Promise((_, tuChoi) => setTimeout(() => tuChoi(new Error("qua-thoi-gian")), 15000)),
+      ]);
+      localStorage.setItem("fb-cfg", cfgText);
+      onAuthStateChanged(auth, (u) => { if (u) S._vao(u); });
+    } catch (err) {
+      if (err && err.message === "qua-thoi-gian") {
+        S._set("loi", "Chờ quá lâu không thấy phản hồi. Tải lại trang rồi thử lại; nếu vẫn treo thì đóng bớt các tab đang mở cùng trang này.");
+      } else {
+        var ma = String(err.code || err.message || "");
+        var giai = ma;
+        if (ma.indexOf("invalid-credential") !== -1 || ma.indexOf("wrong-password") !== -1 || ma.indexOf("user-not-found") !== -1)
+          giai = "Sai email hoặc mật khẩu, hoặc chưa tạo tài khoản này trong Authentication → Users.";
+        else if (ma.indexOf("operation-not-allowed") !== -1)
+          giai = "Chưa bật đăng nhập Email/Password trong Authentication → Sign-in method.";
+        else if (ma.indexOf("network-request-failed") !== -1)
+          giai = "Không ra được mạng. Kiểm tra kết nối, hoặc mạng đang chặn Google.";
+        else if (ma.indexOf("api-key-not-valid") !== -1 || ma.indexOf("invalid-api-key") !== -1)
+          giai = "Cấu hình Firebase không đúng. Dán lại khối firebaseConfig.";
+        else if (ma.indexOf("too-many-requests") !== -1)
+          giai = "Firebase tạm khóa vì thử sai nhiều lần. Chờ vài phút rồi thử lại.";
+        S._set("loi", giai + "  [mã: " + ma + "]");
+      }
+      throw err;
+    }
+  },
+
+  _vao(u) {
+    uid = u.uid;
+    email = u.email;
+    S._set("dang", "Đang tải dữ liệu…");
+
+    // Doc ban tam cua chinh tai khoan nay de hien ngay
+    let tam = null;
+    try { tam = localStorage.getItem(khoaTam()); } catch (e) {}
+    if (tam && window.nhanDuLieu) {
+      try { window.nhanDuLieu(JSON.parse(tam)); } catch (e) {}
+    }
+
+    // Neu 12 giay khong nghe gi tu Firestore thi van cho vao app,
+    // dung ban tren may. daCoSnapshot van false nen khong day gi len.
+    clearTimeout(dongHoCho);
+    dongHoCho = setTimeout(() => {
+      if (daCoSnapshot) return;
+      if (!tam && window.khoTrong) window.khoTrong();
+      S._set("on", "Chưa tải được dữ liệu từ đám mây. Đang dùng bản trên máy, sẽ tự đồng bộ khi kết nối lại. Nếu số liệu trông lạ, hãy tải lại trang trước khi sửa gì.");
+    }, 12000);
+
+    if (unsub) unsub();
+    unsub = onSnapshot(doc(db, "soNo", uid), (snap) => {
+      const d = snap.data();
+      daCoSnapshot = true;
+      clearTimeout(dongHoCho);
+
+      if (!d || !d.data) {
+        if (!tam && window.khoTrong) window.khoTrong();
+        S._set("on", "Đã kết nối. Tài khoản chưa có dữ liệu trên đám mây.");
+        S._day();
+        return;
+      }
+      if (d.data === banDaDay) { S._set("on", "Đã kết nối, dữ liệu khớp nhau."); return; }
+
+      let cuc = null;
+      try { cuc = localStorage.getItem(khoaTam()); } catch (e) {}
+      const mocMay = d.updatedAt || moc(d.data);
+      const mocCuc = cuc ? moc(cuc) : 0;
+
+      if (mocCuc > mocMay && cuc !== d.data) {
+        S._set("on", "Bản trên máy này mới hơn (" + new Date(mocCuc).toLocaleString("vi-VN") + "), đang đẩy lên.");
+        banDaDay = ""; choDay = cuc; S._day();
+        return;
+      }
+
+      banDaDay = d.data;
+      try { localStorage.setItem(khoaTam(), d.data); } catch (e) {}
+      if (window.nhanDuLieu) { try { window.nhanDuLieu(JSON.parse(d.data)); } catch (e) {} }
+      S._set("on", "Đã đồng bộ lúc " + gio() + ".");
+    }, (err) => {
+      clearTimeout(dongHoCho);
+      const ma = err.code || err.message;
+      if (ma && String(ma).indexOf("permission") !== -1) {
+        S._set("loi", "Firestore từ chối đọc dữ liệu. Kiểm tra lại quy tắc bảo mật trong Firebase Console.");
+      } else {
+        S._set("loi", "Mất kết nối: " + ma);
+      }
+    });
+  },
+
+  save(json) {
+    try { if (uid) localStorage.setItem(khoaTam(), json); } catch (e) {}
+    if (!db || !uid || json === banDaDay) return;
+    choDay = json;
+    if (!daCoSnapshot) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => S._day(), 800);
+  },
+
+  async _day() {
+    if (!db || !uid || !choDay || !daCoSnapshot) return;
+    if (!navigator.onLine) { S._set("dang", "Đang offline. Thay đổi sẽ tự đẩy lên khi có mạng lại."); return; }
+    const json = choDay;
+    try {
+      await setDoc(doc(db, "soNo", uid), { data: json, updatedAt: moc(json) || Date.now() }, { merge: true });
+      banDaDay = json; choDay = null;
+      S._set("on", "Đã lưu lên đám mây lúc " + gio() + ".");
+    } catch (err) {
+      S._set("loi", "Chưa lưu được, sẽ thử lại: " + (err.code || err.message));
+    }
+  },
+
+  async disconnect() {
+    try { if (unsub) unsub(); if (app) await signOut(getAuth(app)); } catch (e) {}
+    uid = null; email = null; unsub = null; choDay = null; daCoSnapshot = false; banDaDay = "";
+    S._set("off", "Đã đăng xuất khỏi thiết bị này.");
+  },
+};
+
+window.addEventListener("online", () => S._day());
+window.addEventListener("offline", () => { if (uid) S._set("dang", "Mất mạng. Vẫn dùng được, thay đổi sẽ đẩy lên sau."); });
+
+window.Sync = S;
+
+/* Khoi phuc phien dang nhap cu, khong bat nhap lai */
+const daLuu = localStorage.getItem("fb-cfg");
+if (daLuu) {
+  try {
+    app = initializeApp(docCfg(daLuu), TEN_APP);
+    db = getFirestore(app);
+    const auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+    S._set("cho", "Đang khôi phục phiên đăng nhập…");
+    onAuthStateChanged(auth, (u) => {
+      if (u) S._vao(u);
+      else S._set("off", "");
+    });
+  } catch (e) {
+    S._set("loi", "Cấu hình đã lưu bị lỗi, nhập lại giúp.");
+  }
+} else {
+  S._set("off", "");
+}
+</script>
+
+<script src="./app.js"></script>
+</body>
+</html>
