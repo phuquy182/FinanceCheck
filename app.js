@@ -1492,15 +1492,31 @@ function TabDongBo({
     className: "w-full py-3 rounded-xl bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement(LogOut, {
     size: 16
-  }), " Đăng xuất thiết bị này"), /*#__PURE__*/React.createElement("p", {
+  }), " Đăng xuất thiết bị này"), /*#__PURE__*/React.createElement("button", {
+    onClick: donSach,
+    className: "w-full py-3 rounded-xl bg-violet-50 text-violet-700 font-medium hover:bg-violet-100 text-sm"
+  }, "Xóa bộ nhớ đệm và tải lại"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 text-center"
-  }, "Dữ liệu nằm trên Firebase. Đăng xuất không làm mất gì, đăng nhập lại là thấy đủ."));
+  }, "Dữ liệu nằm trên Firebase. Đăng xuất hay xóa bộ nhớ đệm đều không làm mất gì, đăng nhập lại là thấy đủ."));
 }
 
 /* ================================================================== */
 /* Màn hình đăng nhập                                                  */
 /* ================================================================== */
 
+async function donSach() {
+  try {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+  } catch (e) {/* bỏ qua */}
+  location.reload();
+}
 function ManHinhCho({
   text
 }) {
@@ -1524,6 +1540,9 @@ function ManHinhCho({
     onClick: () => location.reload(),
     className: "px-4 py-2 rounded-xl bg-violet-200 text-violet-800 text-sm font-medium hover:bg-violet-300"
   }, "Tải lại trang"), /*#__PURE__*/React.createElement("button", {
+    onClick: donSach,
+    className: "block w-full text-xs text-violet-500 hover:text-violet-700"
+  }, "Xóa bộ nhớ đệm và tải lại"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       try {
         localStorage.removeItem("fb-cfg");
@@ -1654,7 +1673,10 @@ function ManHinhDangNhap({
     className: "text-xs text-slate-400 text-center"
   }, "Điền đủ các ô thì nút mới bấm được.")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 text-center mt-4"
-  }, "Đăng nhập một lần, lần sau mở lên là vào thẳng.")));
+  }, "Đăng nhập một lần, lần sau mở lên là vào thẳng."), /*#__PURE__*/React.createElement("button", {
+    onClick: donSach,
+    className: "w-full mt-2 text-xs text-slate-400 hover:text-violet-600"
+  }, "Vừa cập nhật bản mới mà app lỗi? Xóa bộ nhớ đệm và tải lại")));
 }
 
 /* ================================================================== */
