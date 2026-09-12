@@ -1556,11 +1556,20 @@ function ManHinhDangNhap({
   sync,
   banMoi
 }) {
-  const [cfg, setCfg] = useState(() => {
+ const [cfg, setCfg] = useState(() => {
+    const defaultCfg = `{
+  "apiKey": "AIzaSyBJZbM60KB6rXY-PfPLeiSymYFJ2Ea27ds",
+  "authDomain": "personal-finance-4d95c.firebaseapp.com",
+  "projectId": "personal-finance-4d95c",
+  "storageBucket": "personal-finance-4d95c.firebasestorage.app",
+  "messagingSenderId": "670718705108",
+  "appId": "1:670718705108:web:5cd78827c8822d88502a41",
+  "measurementId": "G-WCM7E80GGB"
+}`;
     try {
-      return localStorage.getItem("fb-cfg") || "";
+      return localStorage.getItem("fb-cfg") || defaultCfg;
     } catch (e) {
-      return "";
+      return defaultCfg;
     }
   });
   const [email, setEmail] = useState(() => {
