@@ -1,7 +1,7 @@
 /* Service worker
    Nguyen tac: file cua chinh trang luon lay tu mang truoc, chi dung ban luu khi mat mang. */
 
-const KHO = "so-no-v5";
+const KHO = "so-no-v6";
 const TAI_SAN = ["./", "./index.html", "./app.css", "./app.js", "./icon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
