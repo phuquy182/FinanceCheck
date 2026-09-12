@@ -236,7 +236,17 @@ window.addEventListener("offline", () => { if (uid) S._set("dang", "Mất mạng
 window.Sync = S;
 
 /* Khoi phuc phien dang nhap cu, khong bat nhap lai */
-const daLuu = localStorage.getItem("fb-cfg");
+/* Khoi phuc phien dang nhap cu, khong bat nhap lai */
+const defaultCfg = `{
+  "apiKey": "AIzaSyBJZbM60KB6rXY-PfPLeiSymYFJ2Ea27ds",
+  "authDomain": "personal-finance-4d95c.firebaseapp.com",
+  "projectId": "personal-finance-4d95c",
+  "storageBucket": "personal-finance-4d95c.firebasestorage.app",
+  "messagingSenderId": "670718705108",
+  "appId": "1:670718705108:web:5cd78827c8822d88502a41",
+  "measurementId": "G-WCM7E80GGB"
+}`;
+const daLuu = localStorage.getItem("fb-cfg") || defaultCfg;
 if (daLuu) {
   try {
     app = initializeApp(docCfg(daLuu), TEN_APP);
