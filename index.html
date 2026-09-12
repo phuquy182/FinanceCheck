@@ -57,7 +57,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
    - Bo nho tam luu rieng cho tung tai khoan: so-no:<uid>
    - Khong bao gio day len truoc khi doi chieu voi dam may.
    ================================================================ */
-import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
          setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -65,25 +65,21 @@ import { getFirestore, doc, setDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const TEN_APP = "sono";
-let app = null, db = null, uid = null, email = null, unsub = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBJZbM60KB6rXY-PfPLeiSymYFJ2Ea27ds",
+  authDomain: "personal-finance-4d95c.firebaseapp.com",
+  projectId: "personal-finance-4d95c",
+  storageBucket: "personal-finance-4d95c.firebasestorage.app",
+  messagingSenderId: "670718705108",
+  appId: "1:670718705108:web:5cd78827c8822d88502a41",
+  measurementId: "G-WCM7E80GGB"
+};
+let app = null, auth = null, db = null, uid = null, email = null, unsub = null;
 let daCoSnapshot = false;
 let banDaDay = "";
 let choDay = null;
 let timer = null;
 let dongHoCho = null;   // canh gio: khong de ket o man hinh cho
-
-function docCfg(text) {
-  var t = String(text).replace(/\/\/[^\n]*/g, "").trim();
-  t = t.replace(/^(var|let|const)\s+\w+\s*=\s*/, "").trim();
-  t = t.replace(/;+\s*$/, "").trim();
-  var a = t.indexOf("{"), b = t.lastIndexOf("}");
-  if (a === -1 || b === -1) throw new Error("khong tim thay dau ngoac nhon");
-  t = t.slice(a, b + 1);
-  t = t.replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":');
-  t = t.replace(/'/g, '"');
-  t = t.replace(/,(\s*[}\]])/g, "$1");
-  return JSON.parse(t);
-}
 
 const gio = () => new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 const moc = (json) => { try { return JSON.parse(json).updatedAt || 0; } catch (e) { return 0; } };
@@ -97,27 +93,19 @@ const S = {
     if (S.onStatus) S.onStatus(S.status);
   },
 
-  async connect(cfgText, e_mail, pass) {
+  async connect(e_mail, pass) {
     S._set("dang", "Đang đăng nhập…");
-    let cfg;
-    try { cfg = docCfg(cfgText); }
-    catch (err) {
-      S._set("loi", "Cấu hình không đọc được. Dán lại khối firebaseConfig, giữ cả dấu { và }.");
-      throw err;
-    }
     try {
-      if (app) { try { await deleteApp(app); } catch (e2) {} }
+      if (!auth || !db) throw new Error("firebase-chua-san-sang");
       daCoSnapshot = false; banDaDay = ""; choDay = null;
-      app = initializeApp(cfg, TEN_APP + "-" + Date.now());
-      const auth = getAuth(app);
-      db = getFirestore(app);
       try { await setPersistence(auth, browserLocalPersistence); } catch (e3) {}
-      await Promise.race([
+      const ketQua = await Promise.race([
         signInWithEmailAndPassword(auth, e_mail.trim(), pass),
         new Promise((_, tuChoi) => setTimeout(() => tuChoi(new Error("qua-thoi-gian")), 15000)),
       ]);
-      localStorage.setItem("fb-cfg", cfgText);
-      onAuthStateChanged(auth, (u) => { if (u) S._vao(u); });
+      // Không chờ auth observer: đăng nhập thành công thì vào app ngay.
+      // Observer toàn cục bên dưới vẫn phụ trách khôi phục phiên ở lần mở sau.
+      if (ketQua && ketQua.user && ketQua.user.uid !== uid) S._vao(ketQua.user);
     } catch (err) {
       if (err && err.message === "qua-thoi-gian") {
         S._set("loi", "Chờ quá lâu không thấy phản hồi. Tải lại trang rồi thử lại; nếu vẫn treo thì đóng bớt các tab đang mở cùng trang này.");
@@ -130,8 +118,10 @@ const S = {
           giai = "Chưa bật đăng nhập Email/Password trong Authentication → Sign-in method.";
         else if (ma.indexOf("network-request-failed") !== -1)
           giai = "Không ra được mạng. Kiểm tra kết nối, hoặc mạng đang chặn Google.";
+        else if (ma.indexOf("firebase-chua-san-sang") !== -1)
+          giai = "Firebase chưa khởi tạo xong. Tải lại trang rồi thử lại.";
         else if (ma.indexOf("api-key-not-valid") !== -1 || ma.indexOf("invalid-api-key") !== -1)
-          giai = "Cấu hình Firebase không đúng. Dán lại khối firebaseConfig.";
+          giai = "Cấu hình Firebase của ứng dụng không hợp lệ.";
         else if (ma.indexOf("too-many-requests") !== -1)
           giai = "Firebase tạm khóa vì thử sai nhiều lần. Chờ vài phút rồi thử lại.";
         S._set("loi", giai + "  [mã: " + ma + "]");
@@ -224,7 +214,7 @@ const S = {
   },
 
   async disconnect() {
-    try { if (unsub) unsub(); if (app) await signOut(getAuth(app)); } catch (e) {}
+    try { if (unsub) unsub(); if (auth) await signOut(auth); } catch (e) {}
     uid = null; email = null; unsub = null; choDay = null; daCoSnapshot = false; banDaDay = "";
     S._set("off", "Đã đăng xuất khỏi thiết bị này.");
   },
@@ -236,36 +226,33 @@ window.addEventListener("offline", () => { if (uid) S._set("dang", "Mất mạng
 window.Sync = S;
 
 /* Khoi phuc phien dang nhap cu, khong bat nhap lai */
-/* Khoi phuc phien dang nhap cu, khong bat nhap lai */
-const defaultCfg = `{
-  "apiKey": "AIzaSyBJZbM60KB6rXY-PfPLeiSymYFJ2Ea27ds",
-  "authDomain": "personal-finance-4d95c.firebaseapp.com",
-  "projectId": "personal-finance-4d95c",
-  "storageBucket": "personal-finance-4d95c.firebasestorage.app",
-  "messagingSenderId": "670718705108",
-  "appId": "1:670718705108:web:5cd78827c8822d88502a41",
-  "measurementId": "G-WCM7E80GGB"
-}`;
-const daLuu = localStorage.getItem("fb-cfg") || defaultCfg;
-if (daLuu) {
-  try {
-    app = initializeApp(docCfg(daLuu), TEN_APP);
-    db = getFirestore(app);
-    const auth = getAuth(app);
-    setPersistence(auth, browserLocalPersistence).catch(() => {});
-    S._set("cho", "Đang khôi phục phiên đăng nhập…");
-    onAuthStateChanged(auth, (u) => {
-      if (u) S._vao(u);
-      else S._set("off", "");
-    });
-  } catch (e) {
-    S._set("loi", "Cấu hình đã lưu bị lỗi, nhập lại giúp.");
-  }
-} else {
-  S._set("off", "");
+try {
+  app = initializeApp(FIREBASE_CONFIG, TEN_APP);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
+  S._set("cho", "Đang khôi phục phiên đăng nhập…");
+  const hetChoAuth = setTimeout(() => {
+    if (S.status.state === "cho") {
+      S._set("off", "Không khôi phục được phiên cũ. Hãy đăng nhập lại.");
+    }
+  }, 8000);
+  onAuthStateChanged(auth, (u) => {
+    clearTimeout(hetChoAuth);
+    if (u) {
+      if (u.uid !== uid) S._vao(u);
+    } else {
+      S._set("off", "");
+    }
+  }, (err) => {
+    clearTimeout(hetChoAuth);
+    S._set("loi", "Không đọc được trạng thái đăng nhập: " + (err.code || err.message));
+  });
+} catch (e) {
+  S._set("loi", "Không thể khởi tạo kết nối Firebase.");
 }
 </script>
 
-<script src="./app.js?v=6"></script>
+<script src="./app.js?v=7"></script>
 </body>
 </html>

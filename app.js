@@ -41,7 +41,6 @@ const Banknote = p => React.createElement(Svg, p, [P("M2 7a2 2 0 0 1 2-2h16a2 2 
 const LogOut = p => React.createElement(Svg, p, [P("M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"), P("m16 17 5-5-5-5"), P("M21 12H9")]);
 const ChevronDown = p => React.createElement(Svg, p, P("m6 9 6 6 6-6"));
 const ChevronUp = p => React.createElement(Svg, p, P("m18 15-6-6-6 6"));
-const Settings2 = p => React.createElement(Svg, p, [P("M20 7h-9"), P("M14 17H5"), P("M17 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"), P("M7 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z")]);
 const ShoppingBag = p => React.createElement(Svg, p, [P("M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"), P("M3 6h18"), P("M16 10a4 4 0 0 1-8 0")]);
 
 /* ================================================================== */
@@ -1544,10 +1543,8 @@ function ManHinhCho({
     className: "block w-full text-xs text-violet-500 hover:text-violet-700"
   }, "Xóa bộ nhớ đệm và tải lại"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      try {
-        localStorage.removeItem("fb-cfg");
-      } catch (e) {}
-      location.reload();
+      if (window.Sync) window.Sync.disconnect().finally(() => location.reload());
+      else location.reload();
     },
     className: "block w-full text-xs text-slate-400 hover:text-rose-500"
   }, "Vẫn treo? Quay về màn hình đăng nhập")));
@@ -1556,22 +1553,6 @@ function ManHinhDangNhap({
   sync,
   banMoi
 }) {
- const [cfg, setCfg] = useState(() => {
-    const defaultCfg = `{
-  "apiKey": "AIzaSyBJZbM60KB6rXY-PfPLeiSymYFJ2Ea27ds",
-  "authDomain": "personal-finance-4d95c.firebaseapp.com",
-  "projectId": "personal-finance-4d95c",
-  "storageBucket": "personal-finance-4d95c.firebasestorage.app",
-  "messagingSenderId": "670718705108",
-  "appId": "1:670718705108:web:5cd78827c8822d88502a41",
-  "measurementId": "G-WCM7E80GGB"
-}`;
-    try {
-      return localStorage.getItem("fb-cfg") || defaultCfg;
-    } catch (e) {
-      return defaultCfg;
-    }
-  });
   const [email, setEmail] = useState(() => {
     try {
       return localStorage.getItem("fb-email") || "";
@@ -1582,15 +1563,13 @@ function ManHinhDangNhap({
   const [pass, setPass] = useState("");
   const [busy, setBusy] = useState(false);
   const [loi, setLoi] = useState("");
-  const [hienCfg, setHienCfg] = useState(false);
   const moBangFile = typeof location !== "undefined" && location.protocol === "file:";
-  const daLuuCfg = !!cfg;
   if (sync.state === "cho") {
     return /*#__PURE__*/React.createElement(ManHinhCho, {
       text: sync.msg || "Đang mở sổ nợ…"
     });
   }
-  const dayDu = cfg.trim() && email.trim() && pass;
+  const dayDu = email.trim() && pass;
   const vao = async () => {
     if (!dayDu || busy) return;
     setLoi("");
@@ -1603,7 +1582,7 @@ function ManHinhDangNhap({
       try {
         localStorage.setItem("fb-email", email.trim());
       } catch (e) {}
-      await window.Sync.connect(cfg, email, pass);
+      await window.Sync.connect(email, pass);
     } catch (e) {
       setLoi(String(e && (e.code || e.message) || "Không đăng nhập được"));
     }
@@ -1637,20 +1616,7 @@ function ManHinhDangNhap({
     className: "bg-white rounded-3xl p-5 shadow-sm space-y-3"
   }, moBangFile && /*#__PURE__*/React.createElement("div", {
     className: "bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3 text-sm"
-  }, "Bạn đang mở file trực tiếp từ máy nên đồng bộ bị chặn. Hãy mở qua địa chỉ web đã đưa lên Netlify."), daLuuCfg && !hienCfg ? /*#__PURE__*/React.createElement("button", {
-    onClick: () => setHienCfg(true),
-    className: "w-full text-left text-xs text-slate-400 hover:text-violet-500 flex items-center gap-1"
-  }, /*#__PURE__*/React.createElement(Settings2, {
-    size: 12
-  }), " Đã lưu cấu hình Firebase, bấm để đổi") : /*#__PURE__*/React.createElement(Truong, {
-    nhan: "Cấu hình Firebase"
-  }, /*#__PURE__*/React.createElement("textarea", {
-    value: cfg,
-    onChange: e => setCfg(e.target.value),
-    rows: 5,
-    placeholder: "{ \"apiKey\": \"...\", \"projectId\": \"...\" }",
-    className: `${inp} font-mono text-xs`
-  })), /*#__PURE__*/React.createElement(Truong, {
+  }, "Bạn đang mở file trực tiếp từ máy nên đồng bộ bị chặn. Hãy mở qua địa chỉ web đã đưa lên Netlify."), /*#__PURE__*/React.createElement(Truong, {
     nhan: "Email"
   }, /*#__PURE__*/React.createElement("input", {
     value: email,
