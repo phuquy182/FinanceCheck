@@ -42,6 +42,8 @@ const LogOut = p => React.createElement(Svg, p, [P("M9 21H5a2 2 0 0 1-2-2V5a2 2 
 const ChevronDown = p => React.createElement(Svg, p, P("m6 9 6 6 6-6"));
 const ChevronUp = p => React.createElement(Svg, p, P("m18 15-6-6-6 6"));
 const ShoppingBag = p => React.createElement(Svg, p, [P("M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"), P("M3 6h18"), P("M16 10a4 4 0 0 1-8 0")]);
+const GripVertical = p => React.createElement(Svg, p, [P("M9 5h.01"), P("M9 12h.01"), P("M9 19h.01"), P("M15 5h.01"), P("M15 12h.01"), P("M15 19h.01")]);
+const ArrowUpDown = p => React.createElement(Svg, p, [P("m21 16-4 4-4-4"), P("M17 20V4"), P("m3 8 4-4 4 4"), P("M7 4v16")]);
 
 /* ================================================================== */
 /* Dữ liệu mồi: chỉ hiện khi tài khoản chưa có gì trên đám mây          */
@@ -374,6 +376,7 @@ function nangCap(s) {
     paid: s.paid || {},
     dungHanMuc: !!s.dungHanMuc,
     boUocTinh: s.boUocTinh || {},
+    thuTu: s.thuTu || {},
     updatedAt: s.updatedAt || 0
   };
   if (v < 2) out.debts = out.debts.map(d => ({
@@ -395,7 +398,8 @@ const goiNoiDung = d => JSON.stringify({
   nguon: d.nguon,
   paid: d.paid,
   dungHanMuc: d.dungHanMuc,
-  boUocTinh: d.boUocTinh
+  boUocTinh: d.boUocTinh,
+  thuTu: d.thuTu || {}
 });
 
 /* ================================================================== */
@@ -417,6 +421,7 @@ function App() {
   const [paid, setPaid] = useState({});
   const [dungHanMuc, setDungHanMuc] = useState(false);
   const [boUocTinh, setBoUocTinh] = useState({});
+  const [thuTu, setThuTu] = useState({}); // { "2026-10": ["no:d01", ...] } chỉ áp cho đúng tháng đó
   const [coDuLieu, setCoDuLieu] = useState(false);
   const [month, setMonth] = useState(NAY.key);
   const [tab, setTab] = useState("thang");
@@ -441,6 +446,7 @@ function App() {
       setPaid(d.paid);
       setDungHanMuc(d.dungHanMuc);
       setBoUocTinh(d.boUocTinh);
+      setThuTu(d.thuTu || {});
       setCoDuLieu(true);
     };
     window.khoTrong = () => {
@@ -498,7 +504,8 @@ function App() {
       nguon,
       paid,
       dungHanMuc,
-      boUocTinh
+      boUocTinh,
+      thuTu
     };
     const noiDung = goiNoiDung(goi);
     if (noiDung === noiDungRef.current) return;
@@ -508,7 +515,7 @@ function App() {
       updatedAt: Date.now()
     });
     if (window.Sync) window.Sync.save(json);
-  }, [debts, incomes, chi, hanMuc, nguon, paid, dungHanMuc, boUocTinh, coDuLieu]);
+  }, [debts, incomes, chi, hanMuc, nguon, paid, dungHanMuc, boUocTinh, thuTu, coDuLieu]);
 
   /* ---------- tra cứu nguồn ---------- */
   const nguonMap = useMemo(() => {
@@ -728,12 +735,31 @@ function App() {
       });
     });
     items.sort((a, b) => a.day - b.day || (a.loai === "thu" ? -1 : b.loai === "thu" ? 1 : 0));
+
+    // Thứ tự kéo thả riêng của tháng này. Khoản mới chưa có trong danh sách thì chèn theo ngày.
+    const khoaCua = it => `${it.loai}:${it.id}`;
+    const tt = thuTu[month];
+    let sapXep = items;
+    if (tt && tt.length) {
+      const vt = {};
+      tt.forEach((k, i) => { vt[k] = i; });
+      const daBiet = items.filter(it => vt[khoaCua(it)] !== undefined).sort((a, b) => vt[khoaCua(a)] - vt[khoaCua(b)]);
+      const moi = items.filter(it => vt[khoaCua(it)] === undefined);
+      sapXep = daBiet.slice();
+      // Khoản mới: đặt ngay sau khoản cuối cùng có ngày <= ngày của nó
+      moi.forEach(it => {
+        let cho = -1;
+        sapXep.forEach((x, idx) => { if (x.day <= it.day) cho = idx; });
+        sapXep.splice(cho + 1, 0, it);
+      });
+    }
     let bal = prevCum;
-    const out = items.map(it => {
+    const out = sapXep.map(it => {
       bal += it.tien;
       return {
         ...it,
-        bal
+        bal,
+        khoa: khoaCua(it)
       };
     });
     if (out.length) {
@@ -741,7 +767,7 @@ function App() {
       if (min < 0) out[out.findIndex(o => o.bal === min)].day_ = true;
     }
     return out;
-  }, [debts, incomes, chi, month, paid, prevCum, nguon, boUocTinh]);
+  }, [debts, incomes, chi, month, paid, prevCum, nguon, boUocTinh, thuTu]);
   const lowest = timeline.length ? Math.min(...timeline.map(t => t.bal)) : prevCum;
   const totalLeft = months.reduce((s, k) => diffM(month, k) >= 0 ? s + byMonth[k].remain : s, 0);
   const endMonth = months.length ? months[months.length - 1] : month;
@@ -878,6 +904,18 @@ function App() {
       ...b,
       [`${month}|${nguonId}`]: true
     })),
+    coThuTuRieng: !!(thuTu[month] && thuTu[month].length),
+    datThuTu: ds => setThuTu(t => ({
+      ...t,
+      [month]: ds
+    })),
+    boThuTu: () => setThuTu(t => {
+      const n = {
+        ...t
+      };
+      delete n[month];
+      return n;
+    }),
     moSua: (loai, obj) => setModal({
       loai,
       edit: obj
@@ -975,10 +1013,47 @@ function TabThang({
   setDungHanMuc,
   togglePaid,
   boUoc,
+  coThuTuRieng,
+  datThuTu,
+  boThuTu,
   moSua,
   moXoa
 }) {
   const [chon, setChon] = useState(null);
+  const [sapXep, setSapXep] = useState(false);
+  const [keo, setKeo] = useState(null); // { tu, toi }
+  const hangRef = useRef([]);
+
+  // Kéo thả bằng pointer: chạy được cả chuột lẫn cảm ứng
+  const batDauKeo = (i, e) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
+    setKeo({ tu: i, toi: i });
+  };
+  // toi = vị trí chèn trong danh sách gốc: chèn TRƯỚC hàng thứ toi; toi = n là cuối danh sách
+  const dangKeo = e => {
+    if (!keo) return;
+    const y = e.clientY;
+    const n = hangRef.current.length;
+    let toi = n;
+    for (let j = 0; j < n; j++) {
+      const el = hangRef.current[j];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height / 2) { toi = j; break; }
+    }
+    if (toi !== keo.toi) setKeo({ ...keo, toi });
+  };
+  const thaKeo = () => {
+    if (!keo) return;
+    const { tu, toi } = keo;
+    setKeo(null);
+    if (toi === tu || toi === tu + 1) return;
+    const ds = timeline.map(t => t.khoa);
+    const [x] = ds.splice(tu, 1);
+    ds.splice(toi > tu ? toi - 1 : toi, 0, x);
+    datThuTu(ds);
+  };
   const [moNgay, setMoNgay] = useState({});
   const [moDs, setMoDs] = useState(false);
   const hm = hanMuc[month] || 0;
@@ -1042,21 +1117,43 @@ function TabThang({
     className: "flex items-baseline justify-between px-1 mb-2"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "font-semibold text-slate-700"
-  }, "Lịch trong tháng"), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-slate-400"
-  }, "số nhỏ = số dư sau khoản đó")), timeline.length === 0 ? /*#__PURE__*/React.createElement(Trong, {
+  }, "Lịch trong tháng"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, coThuTuRieng && !sapXep && /*#__PURE__*/React.createElement("button", {
+    onClick: boThuTu,
+    className: "text-xs text-slate-400 hover:text-rose-500"
+  }, "Về thứ tự theo ngày"), timeline.length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => { setSapXep(!sapXep); setKeo(null); },
+    className: `flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium ${sapXep ? "bg-violet-400 text-white" : "bg-violet-50 text-violet-600 hover:bg-violet-100"}`
+  }, /*#__PURE__*/React.createElement(ArrowUpDown, {
+    size: 13
+  }), sapXep ? "Xong" : "Sắp xếp"))), sapXep ? /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-violet-600 bg-violet-50 rounded-xl px-3 py-2 mb-2"
+  }, "Giữ biểu tượng ⋮⋮ bên trái rồi kéo lên xuống. Chỉ đổi thứ tự và số dư chạy của tháng này, ngày đến hạn và các tháng khác giữ nguyên.") : /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 px-1 mb-2"
+  }, coThuTuRieng ? "Tháng này đang dùng thứ tự bạn tự sắp. Số nhỏ = số dư sau khoản đó." : "Số nhỏ = số dư sau khoản đó."), timeline.length === 0 ? /*#__PURE__*/React.createElement(Trong, {
     text: "Tháng này chưa có khoản nào. Bấm nút cộng góc dưới để thêm."
   }) : /*#__PURE__*/React.createElement("ol", {
     className: "space-y-1.5"
-  }, timeline.map((it, n) => /*#__PURE__*/React.createElement("li", {
-    key: `${it.loai}-${it.id}-${n}`,
-    className: `bg-white rounded-2xl shadow-sm border-l-4 ${it.loai === "thu" ? "border-emerald-300" : it.loai === "chi" ? "border-amber-200" : it.loai === "uoc" ? "border-sky-300 border-dashed" : it.daTra ? "border-slate-200" : it.cuoiKy ? "border-violet-300" : "border-rose-200"}`
+  }, (hangRef.current.length = timeline.length, null), timeline.map((it, n) => /*#__PURE__*/React.createElement("li", {
+    key: it.khoa || `${it.loai}-${it.id}-${n}`,
+    ref: el => { hangRef.current[n] = el; },
+    className: `${keo && keo.tu === n ? "opacity-40 " : ""}${keo && keo.toi === n && keo.tu !== n && keo.tu + 1 !== n ? "border-t-4 border-t-violet-400 " : ""}${keo && keo.toi === timeline.length && n === timeline.length - 1 && keo.tu !== n ? "border-b-4 border-b-violet-400 " : ""}bg-white rounded-2xl shadow-sm border-l-4 transition-opacity ${it.loai === "thu" ? "border-emerald-300" : it.loai === "chi" ? "border-amber-200" : it.loai === "uoc" ? "border-sky-300 border-dashed" : it.daTra ? "border-slate-200" : it.cuoiKy ? "border-violet-300" : "border-rose-200"}`
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3 p-3"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, sapXep && /*#__PURE__*/React.createElement("span", {
+    onPointerDown: e => batDauKeo(n, e),
+    onPointerMove: dangKeo,
+    onPointerUp: thaKeo,
+    onPointerCancel: () => setKeo(null),
+    className: "touch-none select-none cursor-grab active:cursor-grabbing shrink-0 -ml-1 p-1 rounded-lg text-violet-400 hover:bg-violet-50",
+    "aria-label": "Kéo để đổi thứ tự"
+  }, /*#__PURE__*/React.createElement(GripVertical, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("div", {
     className: `w-9 shrink-0 text-center rounded-xl py-1.5 text-xs font-bold ${it.loai === "thu" ? "bg-emerald-50 text-emerald-600" : it.loai === "chi" ? "bg-amber-50 text-amber-600" : it.loai === "uoc" ? "bg-sky-50 text-sky-600" : "bg-violet-50 text-violet-500"}`
   }, String(it.day).padStart(2, "0")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => it.loai === "chi" ? setMoNgay(m => ({
+    onClick: () => sapXep ? null : it.loai === "chi" ? setMoNgay(m => ({
       ...m,
       [it.day]: !m[it.day]
     })) : it.loai === "uoc" ? null : setChon(it),
