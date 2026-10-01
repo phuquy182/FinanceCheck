@@ -293,7 +293,7 @@ const NHOM = [{
   chu: "text-violet-600",
   nhat: "bg-violet-50"
 }];
-const DATA_VERSION = 4;
+const DATA_VERSION = 5;
 
 /* ================================================================== */
 /* Tiện ích                                                            */
@@ -377,6 +377,7 @@ function nangCap(s) {
     dungHanMuc: !!s.dungHanMuc,
     boUocTinh: s.boUocTinh || {},
     thuTu: s.thuTu || {},
+    duDau: s.duDau || {},
     updatedAt: s.updatedAt || 0
   };
   if (v < 2) out.debts = out.debts.map(d => ({
@@ -399,7 +400,8 @@ const goiNoiDung = d => JSON.stringify({
   paid: d.paid,
   dungHanMuc: d.dungHanMuc,
   boUocTinh: d.boUocTinh,
-  thuTu: d.thuTu || {}
+  thuTu: d.thuTu || {},
+  duDau: d.duDau || {}
 });
 
 /* ================================================================== */
@@ -421,7 +423,8 @@ function App() {
   const [paid, setPaid] = useState({});
   const [dungHanMuc, setDungHanMuc] = useState(false);
   const [boUocTinh, setBoUocTinh] = useState({});
-  const [thuTu, setThuTu] = useState({}); // { "2026-10": ["no:d01", ...] } chỉ áp cho đúng tháng đó
+  const [thuTu, setThuTu] = useState({});
+  const [duDau, setDuDau] = useState({}); // số dư đầu tháng nhập tay; để trống thì lấy của tháng trước // { "2026-10": ["no:d01", ...] } chỉ áp cho đúng tháng đó
   const [coDuLieu, setCoDuLieu] = useState(false);
   const [month, setMonth] = useState(NAY.key);
   const [tab, setTab] = useState("thang");
@@ -447,6 +450,7 @@ function App() {
       setDungHanMuc(d.dungHanMuc);
       setBoUocTinh(d.boUocTinh);
       setThuTu(d.thuTu || {});
+      setDuDau(d.duDau || {});
       setCoDuLieu(true);
     };
     window.khoTrong = () => {
@@ -505,7 +509,8 @@ function App() {
       paid,
       dungHanMuc,
       boUocTinh,
-      thuTu
+      thuTu,
+      duDau
     };
     const noiDung = goiNoiDung(goi);
     if (noiDung === noiDungRef.current) return;
@@ -515,7 +520,7 @@ function App() {
       updatedAt: Date.now()
     });
     if (window.Sync) window.Sync.save(json);
-  }, [debts, incomes, chi, hanMuc, nguon, paid, dungHanMuc, boUocTinh, thuTu, coDuLieu]);
+  }, [debts, incomes, chi, hanMuc, nguon, paid, dungHanMuc, boUocTinh, thuTu, duDau, coDuLieu]);
 
   /* ---------- tra cứu nguồn ---------- */
   const nguonMap = useMemo(() => {
@@ -641,7 +646,10 @@ function App() {
       const sh = sinhHoatChoDongTien(k);
       const uoc = tongUocTinh(k);
       const net = inc - sh.so - due - uoc;
-      dong += net;
+      // Nhập tay thì lấy số đó làm mốc đầu tháng, không nhập thì nối tiếp tháng trước
+      const tuNhap = duDau[k] !== undefined && duDau[k] !== "";
+      const dauThang = tuNhap ? +duDau[k] : dong;
+      dong = dauThang + net;
       map[k] = {
         due,
         paidSum,
@@ -650,11 +658,13 @@ function App() {
         sh,
         uoc,
         net,
+        dauThang,
+        tuNhap,
         cum: dong
       };
     });
     return map;
-  }, [months, debts, incomes, chi, hanMuc, paid, nguon, dungHanMuc, boUocTinh, NAY.key]);
+  }, [months, debts, incomes, chi, hanMuc, paid, nguon, dungHanMuc, boUocTinh, duDau, NAY.key]);
   const cur = byMonth[month] || {
     due: 0,
     paidSum: 0,
@@ -666,12 +676,12 @@ function App() {
     },
     uoc: 0,
     net: 0,
+    dauThang: 0,
+    tuNhap: false,
     cum: 0
   };
-  const prevCum = useMemo(() => {
-    const i = months.indexOf(month);
-    return i > 0 ? byMonth[months[i - 1]].cum : 0;
-  }, [months, month, byMonth]);
+  // Số dư chạy bắt đầu từ mốc đầu tháng: số nhập tay, hoặc nối tiếp tháng trước
+  const prevCum = cur.dauThang;
 
   /* ---------- dòng thời gian ---------- */
   const timeline = useMemo(() => {
@@ -893,6 +903,15 @@ function App() {
     cur: cur,
     lowest: lowest,
     timeline: timeline,
+    duDau: cur.dauThang,
+    duDauNhap: duDau[month],
+    datDuDau: v => setDuDau(d => {
+      const n = {
+        ...d
+      };
+      if (v === "" || v === undefined) delete n[month];else n[month] = v;
+      return n;
+    }),
     hanMuc: hanMuc,
     setHanMuc: setHanMuc,
     soChi: soChi,
@@ -1005,6 +1024,9 @@ function TabThang({
   cur,
   lowest,
   timeline,
+  duDau,
+  duDauNhap,
+  datDuDau,
   hanMuc,
   setHanMuc,
   soChi,
@@ -1019,6 +1041,7 @@ function TabThang({
   moSua,
   moXoa
 }) {
+  const coNhapTay = duDauNhap !== undefined && duDauNhap !== "";
   const [chon, setChon] = useState(null);
   const [sapXep, setSapXep] = useState(false);
   const [keo, setKeo] = useState(null); // { tu, toi }
@@ -1135,7 +1158,25 @@ function TabThang({
     text: "Tháng này chưa có khoản nào. Bấm nút cộng góc dưới để thêm."
   }) : /*#__PURE__*/React.createElement("ol", {
     className: "space-y-1.5"
-  }, (hangRef.current.length = timeline.length, null), timeline.map((it, n) => /*#__PURE__*/React.createElement("li", {
+  }, (hangRef.current.length = timeline.length, null), /*#__PURE__*/React.createElement("li", {
+    key: "du-dau-thang",
+    className: `rounded-2xl border border-dashed px-3 py-2 flex items-center gap-2 ${duDau < 0 ? "bg-rose-50 border-rose-200" : "bg-slate-50 border-slate-200"}`
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex-1 min-w-0 text-sm text-slate-500"
+  }, "Số dư đầu tháng", /*#__PURE__*/React.createElement("span", {
+    className: "block text-xs text-slate-400"
+  }, coNhapTay ? "Bạn tự nhập, các tháng sau tính tiếp từ đây" : "Để trống thì tự lấy của tháng trước")), /*#__PURE__*/React.createElement(NumInput, {
+    value: coNhapTay ? duDauNhap : "",
+    onChange: datDuDau,
+    placeholder: fmt(duDau),
+    className: `w-32 text-right tabular-nums font-semibold bg-white border rounded-xl px-2 py-1 outline-none focus:border-violet-300 ${duDau < 0 ? "text-rose-500 border-rose-200" : "text-slate-600 border-slate-200"}`
+  }), coNhapTay && /*#__PURE__*/React.createElement("button", {
+    onClick: () => datDuDau(""),
+    className: "p-1 text-slate-300 hover:text-rose-500 shrink-0",
+    "aria-label": "Bỏ số nhập tay, tự lấy của tháng trước"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 14
+  }))), timeline.map((it, n) => /*#__PURE__*/React.createElement("li", {
     key: it.khoa || `${it.loai}-${it.id}-${n}`,
     ref: el => { hangRef.current[n] = el; },
     className: `${keo && keo.tu === n ? "opacity-40 " : ""}${keo && keo.toi === n && keo.tu !== n && keo.tu + 1 !== n ? "border-t-4 border-t-violet-400 " : ""}${keo && keo.toi === timeline.length && n === timeline.length - 1 && keo.tu !== n ? "border-b-4 border-b-violet-400 " : ""}bg-white rounded-2xl shadow-sm border-l-4 transition-opacity ${it.loai === "thu" ? "border-emerald-300" : it.loai === "chi" ? "border-amber-200" : it.loai === "uoc" ? "border-sky-300 border-dashed" : it.daTra ? "border-slate-200" : it.cuoiKy ? "border-violet-300" : "border-rose-200"}`
