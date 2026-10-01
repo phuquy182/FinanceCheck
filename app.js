@@ -1005,7 +1005,6 @@ function App() {
     month: month,
     nguon: nguon,
     nguonGanNhat: nguonGanNhat,
-    onOpenPicker: setPicker,
     onClose: () => setModal(null),
     onSave: obj => luuKhoan(modal.loai, obj)
   }), picker && /*#__PURE__*/React.createElement(MonthPicker, {
@@ -2007,7 +2006,6 @@ function FormModal({
   nguonGanNhat,
   onClose,
   onSave,
-  onOpenPicker
 }) {
   const e = modal.edit;
   const loai = modal.loai;
@@ -2091,27 +2089,21 @@ function FormModal({
   }))), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2.5"
   }, /*#__PURE__*/React.createElement(Truong, {
+    nhan: laNo ? "Số tiền mỗi kỳ" : "Số tiền"
+  }, /*#__PURE__*/React.createElement(NumInput, {
+    value: f.amount,
+    onChange: v => set("amount", v),
+    autoFocus: !e,
+    className: "w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-violet-300 bg-white text-slate-800 text-right text-2xl font-bold tabular-nums"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: laNo ? "grid grid-cols-2 gap-3" : ""
+  }, /*#__PURE__*/React.createElement(Truong, {
     nhan: laNo ? "Tên khoản nợ" : laThu ? "Tên khoản thu" : "Tiêu gì"
   }, /*#__PURE__*/React.createElement("input", {
     value: f.name,
     onChange: ev => set("name", ev.target.value),
     placeholder: laNo ? "VD: Trả góp xe" : laThu ? "VD: Lương tháng" : "VD: Cơm trưa",
     className: inp
-  })), laNo && /*#__PURE__*/React.createElement(Truong, {
-    nhan: "Nguồn hoặc app"
-  }, /*#__PURE__*/React.createElement("input", {
-    value: f.source,
-    onChange: ev => set("source", ev.target.value),
-    placeholder: "VD: MoMo, Sacombank",
-    className: inp
-  })), /*#__PURE__*/React.createElement("div", {
-    className: laNo ? "grid grid-cols-2 gap-3" : ""
-  }, /*#__PURE__*/React.createElement(Truong, {
-    nhan: laNo ? "Số tiền mỗi kỳ" : "Số tiền"
-  }, /*#__PURE__*/React.createElement(NumInput, {
-    value: f.amount,
-    onChange: v => set("amount", v),
-    className: `${inp} tabular-nums`
   })), laNo && /*#__PURE__*/React.createElement(Truong, {
     nhan: "Tổng số kỳ"
   }, /*#__PURE__*/React.createElement("input", {
@@ -2121,7 +2113,14 @@ function FormModal({
     onChange: ev => set("periods", ev.target.value),
     placeholder: "12",
     className: inp
-  }))), laChi && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Truong, {
+  }))), laNo && /*#__PURE__*/React.createElement(Truong, {
+    nhan: "Nguồn hoặc app"
+  }, /*#__PURE__*/React.createElement("input", {
+    value: f.source,
+    onChange: ev => set("source", ev.target.value),
+    placeholder: "VD: MoMo, Sacombank",
+    className: inp
+  })), laChi && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Truong, {
     nhan: "Nhóm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-2"
@@ -2145,7 +2144,7 @@ function FormModal({
     size: 13
   }), n.ten))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 mt-1.5"
-  }, nguon.find(n => n.id === f.nguon)?.traSau ? "Trả sau: không trừ dòng tiền tháng này, sẽ vào hóa đơn tháng sau." : "Trả ngay: trừ vào dòng tiền đúng ngày chi."))), laNo && ovKeys.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, nguon.find(n => n.id === f.nguon)?.traSau ? "Vào hóa đơn tháng sau" : "Trừ ngay ngày chi"))), laNo && ovKeys.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "bg-amber-50 border border-amber-200 rounded-xl p-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-amber-800 mb-2"
@@ -2180,22 +2179,11 @@ function FormModal({
     type: "button",
     onClick: () => setOv({}),
     className: "mt-2 text-xs text-amber-700 underline hover:text-rose-600"
-  }, "Dùng một mức chung cho tất cả các kỳ")), /*#__PURE__*/React.createElement(Truong, {
-    nhan: laNo ? "Kỳ đầu tiên rơi vào tháng" : laThu ? "Bắt đầu từ tháng" : "Thuộc tháng"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => onOpenPicker({
-      value: monthValue,
-      onPick: k => set(laNo ? "start" : "month", k)
-    }),
-    className: `${inp} flex items-center justify-between text-left hover:border-violet-300`
-  }, /*#__PURE__*/React.createElement("span", null, monthLabel(monthValue)), /*#__PURE__*/React.createElement(CalendarDays, {
-    size: 16,
-    className: "text-violet-400"
-  }))), /*#__PURE__*/React.createElement(ChonNgay, {
-    nhan: laNo ? "Đến hạn ngày" : laThu ? "Nhận tiền ngày" : "Chi vào ngày",
+  }, "Dùng một mức chung cho tất cả các kỳ")), /*#__PURE__*/React.createElement(ChonNgay, {
+    nhan: laNo ? "Kỳ đầu đến hạn" : laThu ? "Nhận tiền ngày" : "Ngày chi",
     value: f.day,
     onPick: d => set("day", d),
+    doiThang: k => set(laNo ? "start" : "month", k),
     tone: laNo ? "violet" : laThu ? "emerald" : "amber",
     month: monthValue,
     lapLai: !laChi
@@ -2224,6 +2212,7 @@ function ChonNgay({
   onPick,
   tone,
   month,
+  doiThang,
   lapLai
 }) {
   const [mo, setMo] = useState(!value);
@@ -2242,7 +2231,7 @@ function ChonNgay({
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("span", {
     className: `${mau} px-2 py-0.5 rounded-lg text-sm font-semibold`
-  }, value ? value : "chọn", value && lapLai ? " hàng tháng" : ""), mo ? /*#__PURE__*/React.createElement(ChevronUp, {
+  }, value ? `${String(value).padStart(2, "0")}/${shortMonth(month)}` : "chọn", value && lapLai ? " · hàng tháng" : ""), mo ? /*#__PURE__*/React.createElement(ChevronUp, {
     size: 15,
     className: "text-slate-400"
   }) : /*#__PURE__*/React.createElement(ChevronDown, {
@@ -2250,7 +2239,25 @@ function ChonNgay({
     className: "text-slate-400"
   }))), mo && /*#__PURE__*/React.createElement("div", {
     className: "mt-2"
-  }, /*#__PURE__*/React.createElement(DayGrid, {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => doiThang(addM(month, -1)),
+    className: "p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200",
+    "aria-label": "Tháng trước"
+  }, /*#__PURE__*/React.createElement(ChevronLeft, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-medium text-slate-600"
+  }, monthLabel(month)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => doiThang(addM(month, 1)),
+    className: "p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200",
+    "aria-label": "Tháng sau"
+  }, /*#__PURE__*/React.createElement(ChevronRight, {
+    size: 16
+  }))), /*#__PURE__*/React.createElement(DayGrid, {
     value: value,
     onPick: d => {
       onPick(d);
@@ -2274,11 +2281,13 @@ function NumInput({
   value,
   onChange,
   className,
-  placeholder = "0"
+  placeholder = "0",
+  autoFocus
 }) {
   return /*#__PURE__*/React.createElement("input", {
     type: "text",
     inputMode: "numeric",
+    autoFocus: autoFocus,
     value: value === "" || value === undefined ? "" : fmt(value),
     onChange: e => {
       const d = digits(e.target.value);
