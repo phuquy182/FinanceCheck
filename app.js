@@ -363,6 +363,8 @@ function debtInMonth(debt, month) {
   };
 }
 const incomeInMonth = (inc, month) => inc.repeat ? diffM(inc.month, month) >= 0 ? inc : null : inc.month === month ? inc : null;
+// Số tiền của khoản thu trong một tháng: ưu tiên số riêng của tháng đó
+const soTienThu = (inc, month) => inc.ov && inc.ov[month] !== undefined ? inc.ov[month] : inc.amount;
 function nangCap(s) {
   if (!s || typeof s !== "object") return null;
   const v = s.v || 1;
@@ -642,7 +644,7 @@ function App() {
         const o = debtInMonth(d, k);
         return s + (o && paid[`${k}|${d.id}`] ? o.amount : 0);
       }, 0);
-      const inc = incomes.reduce((s, i) => s + (incomeInMonth(i, k) ? i.amount : 0), 0);
+      const inc = incomes.reduce((s, i) => s + (incomeInMonth(i, k) ? soTienThu(i, k) : 0), 0);
       const sh = sinhHoatChoDongTien(k);
       const uoc = tongUocTinh(k);
       const net = inc - sh.so - due - uoc;
@@ -695,6 +697,7 @@ function App() {
         ten: d.name,
         phu: `Kỳ ${o.period}/${d.periods} · ${d.source}`,
         tien: -o.amount,
+        rieng: !!(d.ov && d.ov[month] !== undefined),
         cuoiKy: o.isLast,
         daTra: !!paid[`${month}|${d.id}`],
         goc: d
@@ -707,7 +710,9 @@ function App() {
         day: ngayThuc(i.day, month),
         ten: i.name,
         phu: i.repeat ? "Thu nhập · lặp hàng tháng" : "Thu nhập",
-        tien: i.amount,
+        tien: soTienThu(i, month),
+        rieng: !!(i.ov && i.ov[month] !== undefined),
+        lapLai: !!i.repeat,
         goc: i
       });
     });
@@ -935,6 +940,20 @@ function App() {
       delete n[month];
       return n;
     }),
+    datRieng: (loai, id, giaTri) => {
+      const setter = loai === "no" ? setDebts : setIncomes;
+      setter(l => l.map(x => {
+        if (x.id !== id) return x;
+        const ov = {
+          ...(x.ov || {})
+        };
+        if (giaTri === "" || giaTri === undefined) delete ov[month];else ov[month] = +giaTri;
+        return {
+          ...x,
+          ov
+        };
+      }));
+    },
     moSua: (loai, obj) => setModal({
       loai,
       edit: obj
@@ -1038,11 +1057,17 @@ function TabThang({
   coThuTuRieng,
   datThuTu,
   boThuTu,
+  datRieng,
   moSua,
   moXoa
 }) {
   const coNhapTay = duDauNhap !== undefined && duDauNhap !== "";
   const [chon, setChon] = useState(null);
+  const [tienRieng, setTienRieng] = useState("");
+  const moBang = it => {
+    setTienRieng(Math.abs(it.tien));
+    setChon(it);
+  };
   const [sapXep, setSapXep] = useState(false);
   const [keo, setKeo] = useState(null); // { tu, toi }
   const hangRef = useRef([]);
@@ -1197,7 +1222,7 @@ function TabThang({
     onClick: () => sapXep ? null : it.loai === "chi" ? setMoNgay(m => ({
       ...m,
       [it.day]: !m[it.day]
-    })) : it.loai === "uoc" ? null : setChon(it),
+    })) : it.loai === "uoc" ? null : moBang(it),
     className: "min-w-0 flex-1 text-left"
   }, /*#__PURE__*/React.createElement("div", {
     className: `font-medium truncate ${it.daTra ? "line-through text-slate-300" : it.loai === "chi" ? "text-slate-500 text-sm" : "text-slate-700"}`
@@ -1209,7 +1234,9 @@ function TabThang({
     className: "inline-flex items-center gap-0.5 bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md font-medium"
   }, /*#__PURE__*/React.createElement(Flag, {
     size: 10
-  }), " kỳ cuối"), it.loai === "uoc" && /*#__PURE__*/React.createElement("span", {
+  }), " kỳ cuối"), it.rieng && /*#__PURE__*/React.createElement("span", {
+    className: "bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md font-medium"
+  }, "riêng tháng này"), it.loai === "uoc" && /*#__PURE__*/React.createElement("span", {
     className: "bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-md font-medium"
   }, "ước tính"), it.day_ && /*#__PURE__*/React.createElement("span", {
     className: "bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md font-medium"
@@ -1374,8 +1401,31 @@ function TabThang({
     className: "text-lg font-semibold text-slate-800 truncate"
   }, chon.ten), /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-500 mt-1"
-  }, chon.phu), /*#__PURE__*/React.createElement("div", {
-    className: "mt-5 space-y-2"
+  }, chon.phu), (chon.loai === "no" || chon.lapLai) && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-amber-800 mb-2"
+  }, "Số tiền riêng cho ", monthLabel(month).toLowerCase(), " \u2014 các tháng khác giữ nguyên"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(NumInput, {
+    value: tienRieng,
+    onChange: setTienRieng,
+    className: "flex-1 min-w-0 text-right tabular-nums font-semibold bg-white border border-amber-200 rounded-lg px-2 py-1.5 outline-none focus:border-amber-400"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      datRieng(chon.loai, chon.goc.id, tienRieng);
+      setChon(null);
+    },
+    disabled: !(+tienRieng > 0),
+    className: "px-3 py-1.5 rounded-lg bg-amber-300 text-amber-900 text-sm font-medium disabled:opacity-30 shrink-0"
+  }, "Lưu")), chon.rieng && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      datRieng(chon.loai, chon.goc.id, "");
+      setChon(null);
+    },
+    className: "mt-2 text-xs text-amber-700 underline hover:text-rose-600"
+  }, "Bỏ số riêng, dùng lại mức chung ", fmt(chon.goc.amount))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 space-y-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       moSua(chon.loai, chon.goc);
@@ -1384,7 +1434,7 @@ function TabThang({
     className: "w-full py-3 rounded-xl bg-violet-100 text-violet-800 font-medium hover:bg-violet-200 flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement(Pencil, {
     size: 16
-  }), " Sửa"), /*#__PURE__*/React.createElement("button", {
+  }), " Sửa toàn bộ khoản"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       moXoa(chon.loai, chon.goc.id, chon.ten);
       setChon(null);
