@@ -1110,6 +1110,8 @@ function TabThang({
   const nhipDo = hm > 0 ? hm * ngayHienTai / soNgay : 0;
   const tiLe = hm > 0 ? soChi.tong / hm : 0;
   const duBao = laThangNay && ngayHienTai > 0 ? soChi.tong / ngayHienTai * soNgay : soChi.tong;
+  // Vài ngày đầu tháng, chia cho số ngày quá nhỏ nên dự báo vô nghĩa
+  const duBaoDuocTin = !laThangNay || ngayHienTai >= 7;
   const lechNhip = soChi.tong - nhipDo;
   return /*#__PURE__*/React.createElement("div", {
     className: "px-4 lg:grid lg:grid-cols-[1fr_20rem] lg:gap-6 lg:items-start"
@@ -1136,29 +1138,7 @@ function TabThang({
   }, /*#__PURE__*/React.createElement(TriangleAlert, {
     size: 16,
     className: "mt-0.5 shrink-0"
-  }), /*#__PURE__*/React.createElement("span", null, "Số dư chạm đáy ", /*#__PURE__*/React.createElement("b", null, fmt(lowest), "đ"), " trong tháng. Dòng có nhãn ", /*#__PURE__*/React.createElement("b", null, "đáy"), " cho biết cần xoay tiền trước ngày nào.")), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-3 shadow-sm space-y-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between gap-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm text-slate-600"
-  }, "Hạn mức sinh hoạt"), /*#__PURE__*/React.createElement(NumInput, {
-    value: hanMuc[month] ?? "",
-    onChange: v => setHanMuc(e => ({
-      ...e,
-      [month]: v === "" ? 0 : v
-    })),
-    className: "w-36 text-right font-semibold tabular-nums bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 outline-none focus:border-amber-300"
-  })), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400"
-  }, cur.sh.kieu === "thucte" && "Dòng tiền đang trừ theo chi tiêu thực tế đã ghi.", cur.sh.kieu === "hanmuc" && "Dòng tiền đang trừ theo hạn mức.", cur.sh.kieu === "hanmuc-thieu" && "Tháng đã qua nhưng chưa ghi chi tiêu, đang tạm tính theo hạn mức."), laThangNay && /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center gap-2 text-xs text-slate-500 pt-1 border-t border-slate-100"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: dungHanMuc,
-    onChange: e => setDungHanMuc(e.target.checked),
-    className: "w-4 h-4 accent-violet-400"
-  }), "Tháng này tính theo hạn mức thay vì chi tiêu thực"))), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, "Số dư chạm đáy ", /*#__PURE__*/React.createElement("b", null, fmt(lowest), "đ"), " trong tháng. Dòng có nhãn ", /*#__PURE__*/React.createElement("b", null, "đáy"), " cho biết cần xoay tiền trước ngày nào."))), /*#__PURE__*/React.createElement("div", {
     className: "mt-4 lg:mt-0 lg:order-1 space-y-5"
   }, /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-baseline justify-between px-1 mb-2"
@@ -1178,9 +1158,7 @@ function TabThang({
     className: "text-xs text-violet-600 bg-violet-50 rounded-xl px-3 py-2 mb-2"
   }, "Giữ biểu tượng ⋮⋮ bên trái rồi kéo lên xuống. Chỉ đổi thứ tự và số dư chạy của tháng này, ngày đến hạn và các tháng khác giữ nguyên.") : /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 px-1 mb-2"
-  }, coThuTuRieng ? "Tháng này đang dùng thứ tự bạn tự sắp. Số nhỏ = số dư sau khoản đó." : "Số nhỏ = số dư sau khoản đó."), timeline.length === 0 ? /*#__PURE__*/React.createElement(Trong, {
-    text: "Tháng này chưa có khoản nào. Bấm nút cộng góc dưới để thêm."
-  }) : /*#__PURE__*/React.createElement("ol", {
+  }, coThuTuRieng ? "Tháng này đang dùng thứ tự bạn tự sắp. Số nhỏ = số dư sau khoản đó." : "Số nhỏ = số dư sau khoản đó."), /*#__PURE__*/React.createElement("ol", {
     className: "space-y-1.5"
   }, (hangRef.current.length = timeline.length, null), /*#__PURE__*/React.createElement("li", {
     key: "du-dau-thang",
@@ -1289,7 +1267,10 @@ function TabThang({
     "aria-label": "Xóa"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 14
-  }))))))))), /*#__PURE__*/React.createElement("section", {
+  })))))))), timeline.length === 0 && /*#__PURE__*/React.createElement("li", {
+    key: "trong",
+    className: "bg-white rounded-2xl p-5 text-center text-sm text-slate-400 shadow-sm"
+  }, "Tháng này chưa có khoản nào. Bấm nút cộng góc dưới để thêm.")), /*#__PURE__*/React.createElement("section", {
     className: "bg-white rounded-2xl p-4 shadow-sm space-y-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-baseline justify-between"
@@ -1297,9 +1278,21 @@ function TabThang({
     className: "font-semibold text-slate-700 flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(ShoppingBag, {
     size: 16
-  }), " Chi tiêu"), /*#__PURE__*/React.createElement("span", {
-    className: "text-sm tabular-nums text-slate-600"
-  }, fmt(soChi.tong), " / ", fmt(hm), "đ")), /*#__PURE__*/React.createElement("div", {
+  }), " Chi tiêu"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-baseline gap-1.5 text-sm"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "tabular-nums font-semibold text-slate-700"
+  }, fmt(soChi.tong)), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-400"
+  }, "/"), /*#__PURE__*/React.createElement(NumInput, {
+    value: hanMuc[month] ?? "",
+    onChange: v => setHanMuc(e => ({
+      ...e,
+      [month]: v === "" ? 0 : v
+    })),
+    placeholder: "đặt hạn mức",
+    className: "w-28 text-right tabular-nums font-semibold bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 outline-none focus:border-amber-400 text-sm"
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "h-2.5 rounded-full bg-slate-100 overflow-hidden relative"
   }, /*#__PURE__*/React.createElement("div", {
     className: `h-full rounded-full transition-all ${tiLe > 1 ? "bg-rose-400" : tiLe > 0.85 ? "bg-amber-300" : "bg-emerald-300"}`,
@@ -1313,9 +1306,18 @@ function TabThang({
     }
   })), hm > 0 ? /*#__PURE__*/React.createElement("div", {
     className: `text-sm rounded-xl p-2.5 ${lechNhip > 0 ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`
-  }, laThangNay ? lechNhip > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Đang tiêu nhanh hơn nhịp, vượt ", /*#__PURE__*/React.createElement("b", null, fmt(lechNhip), "đ"), " so với mốc ngày ", ngayHienTai, ". Theo đà này cuối tháng khoảng ", /*#__PURE__*/React.createElement("b", null, fmt(duBao), "đ"), ".") : /*#__PURE__*/React.createElement(React.Fragment, null, "Đang trong nhịp, còn dư ", /*#__PURE__*/React.createElement("b", null, fmt(-lechNhip), "đ"), " so với mốc ngày ", ngayHienTai, ". Theo đà này cuối tháng khoảng ", /*#__PURE__*/React.createElement("b", null, fmt(duBao), "đ"), ".") : tiLe > 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Tháng này đã vượt hạn mức ", /*#__PURE__*/React.createElement("b", null, fmt(soChi.tong - hm), "đ"), ".") : /*#__PURE__*/React.createElement(React.Fragment, null, "Còn lại ", /*#__PURE__*/React.createElement("b", null, fmt(hm - soChi.tong), "đ"), " trong hạn mức.")) : /*#__PURE__*/React.createElement("p", {
+  }, laThangNay ? lechNhip > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Đang tiêu nhanh hơn nhịp, vượt ", /*#__PURE__*/React.createElement("b", null, fmt(lechNhip), "đ"), " so với mốc ngày ", ngayHienTai, ".", duBaoDuocTin ? /*#__PURE__*/React.createElement(React.Fragment, null, " Theo đà này cuối tháng khoảng ", /*#__PURE__*/React.createElement("b", null, fmt(duBao), "đ"), ".") : " Mới đầu tháng, chưa dự báo được cả tháng.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Đang trong nhịp, còn dư ", /*#__PURE__*/React.createElement("b", null, fmt(-lechNhip), "đ"), " so với mốc ngày ", ngayHienTai, ".", duBaoDuocTin ? /*#__PURE__*/React.createElement(React.Fragment, null, " Theo đà này cuối tháng khoảng ", /*#__PURE__*/React.createElement("b", null, fmt(duBao), "đ"), ".") : " Mới đầu tháng, chưa dự báo được cả tháng.") : tiLe > 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Tháng này đã vượt hạn mức ", /*#__PURE__*/React.createElement("b", null, fmt(soChi.tong - hm), "đ"), ".") : /*#__PURE__*/React.createElement(React.Fragment, null, "Còn lại ", /*#__PURE__*/React.createElement("b", null, fmt(hm - soChi.tong), "đ"), " trong hạn mức.")) : /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400"
-  }, "Đặt hạn mức sinh hoạt để theo dõi nhịp độ chi tiêu."), /*#__PURE__*/React.createElement("div", {
+  }, "Nhập hạn mức ở trên để theo dõi nhịp độ chi tiêu."), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, cur.sh.kieu === "thucte" && "Dòng tiền đang trừ theo chi tiêu thực tế đã ghi.", cur.sh.kieu === "hanmuc" && "Dòng tiền đang trừ theo hạn mức.", cur.sh.kieu === "hanmuc-thieu" && "Tháng đã qua nhưng chưa ghi chi tiêu, đang tạm tính theo hạn mức."), laThangNay && /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-2 text-xs text-slate-500"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dungHanMuc,
+    onChange: e => setDungHanMuc(e.target.checked),
+    className: "w-4 h-4 accent-violet-400"
+  }), "Tháng này tính theo hạn mức thay vì chi tiêu thực"), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-3 gap-2"
   }, NHOM.map(n => {
     const v = soChi.theoNhom[n.id] || 0;
@@ -2387,13 +2389,6 @@ function Dong({
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 15
   })));
-}
-function Trong({
-  text
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-2xl p-6 text-center text-sm text-slate-400 shadow-sm"
-  }, text);
 }
 function Sheet({
   children,
